@@ -5,12 +5,14 @@
 #######################################
 
 import pgzrun
-from random import randint
+from random import randint, shuffle
 import time
 
+#Screen Dimensions
 WIDTH = 400
 HEIGHT = 400
 
+#Game State Variables
 dots = []
 lines = []
 next_dot = 0
@@ -38,7 +40,7 @@ def create_dots():
             actor = Actor("dot")
         else:
             actor = Actor("red-dot")
-        actor.pos randint(20, WIDTH - 20), randint(20, HEIGHT - 20)
+        actor.pos = randint(20, WIDTH - 20), randint(20, HEIGHT - 20)
         dots.append(actor)
 
     shuffle(dots)
@@ -55,23 +57,28 @@ def draw():
 
     if game_state == "won":
         screen.draw.text("You Win!", center=(WIDTH // 2, HEIGHT // 2), fontsize=60, color = "green")
-        screen.draw.text("Click to Restart", center=(WIDTH //2, HEIGHT //2 + 40), fontsize=30, color = "yellow")
+        screen.draw.text("Click to Restart", center=(WIDTH //2, HEIGHT //2 + 40), fontsize=30, color = "white")
         return
-    
+    elif game_state == "lost":
+        screen.draw.text("You Lose!", center=(WIDTH // 2, HEIGHT // 2), fontsize=60, color = "red")
+        screen.draw.text("Click to Restart", center=(WIDTH //2, HEIGHT //2 + 40), fontsize=30, color = "white")
+
+    #Draw Numbered Dots
     number = 1
     for dot in dots:
-        if dot.image == "dot"
+        if dot.image == "dot":
             screen.draw.text(str(number),(dot.pos[0], dot.pos[1] + 12))
             number += 1
         dot.draw()
-        
+
+    #Draw Lines    
     for line in lines:
         screen.draw.line(line[0], line[1], (100, 0 , 0))
 
     #Timer Function
     elapsed = time.time() - start_time
     remaining  = max(0, int(time_limit - elapsed))
-    screen.draw.text(f"Time: {remaining}", (10,10) color = "white")
+    screen.draw.text(f"Time: {remaining}", (10,10), color = "white")
 
 #######################################
 #
@@ -79,17 +86,56 @@ def draw():
 #
 #######################################
 
-def on_mouse_down(pos):
-    global next_dot
-    global lines
+def update():
+    global game_state
+    if game_state == "playing":
+        elapsed = time.time() - start_time
+        if elapsed > time_limit:
+            game_state = "lost"
+    
 
-    if dots[next_dot].collidepoint(pos):
-        if next_dot:
-            lines.append((dots[next_dot - 1].pos, dots[next_dot].pos))
+def on_mouse_down(pos):
+    global next_dot, lines, game_state
+
+    #Allow Restart After Game Over
+    if game_state in ["won", "lost"]:
+        create_dots()
+        return
+    
+    if game_state != "playing":
+        return
+
+    real_dots = [dot for dot in dots if dot.image == "dot"]
+
+    if next_dot < len(real_dots):
+        expected_dot = real_dots[next_dot]
+    else:
+        expected_dot = None
+    
+    if expected_dot and expected_dot.collidepoint(pos):
+        if next_dot > 0:
+            lines.append((real_dots[next_dot - 1].pos, expected_dot.pos))
         next_dot += 1
+        
+        if next_dot >= len(real_dots):
+            game_state = "won"
 
     else:
+        # Check if clicked on a wrong dot or decoy
+        for dot in dots:
+            if dot.collidepoint(pos):
+                if dot.image != "dot" or dot != expected_dot:
+                    game_state = "lost"
+                    return
+
+        # Reset on incorrect click
         lines = []
         next_dot = 0
         
+#######################################
+#
+#   Start Game
+#
+#######################################
+create_dots()
 pgzrun.go()
